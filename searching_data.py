@@ -57,7 +57,7 @@ class DataGraber(metaclass = MetaSingleton):
 	def __init__(self, search_item, browser = 'phantom_js', show_process = False, max_results = MAX_RESULTS):
 		if browser == 'phantom_js':
 			self.webdriver = webdriver.PhantomJS(PHANTOM_JS_PATH)
-		elif browser == "filrefor":
+		elif browser == "firefox":
 			self.webdriver = webdriver.Firefox()
 		elif browser == "chrome":
 			options = webdriver.ChromeOptions()
@@ -77,7 +77,8 @@ class DataGraber(metaclass = MetaSingleton):
 			print('Getting the data...')
 		self.webdriver.get("https://tap.az/")
 
-	def get_data_from_tap_az(self):
+	def get_data_from_tapaz(self):
+		product_list = []
 		input_item = self.webdriver.find_element_by_xpath('//input[@id="keywords"]')
 		button_item = self.webdriver.find_element_by_xpath("//button[@type='submit']")
 		input_item.clear()
@@ -100,6 +101,9 @@ class DataGraber(metaclass = MetaSingleton):
 				product_curr = product.find('span', attrs = {'class': 'price-cur'}).text
 				product_price = product.find('span', attrs = {'class': 'price-val'}).text
 				product_price = float("".join(product_price.strip().split()))
+
+				product_list.append((product_title, product_price,product_curr, product_date))
+				
 				if self.show_process:
 					output_builder = StatusBuilder.prepate_console_output(
 						item_counter,
@@ -108,9 +112,37 @@ class DataGraber(metaclass = MetaSingleton):
 						product_curr,
 						self.search_item
 					)
-					print(output_builder)	
+					print(output_builder)
+
 		finally:
 			self.webdriver.quit()
+
+		def get_contact_data_from_tap_az(self, link):
+			res = {}
+			response = requests(link)
+			soup = BeautifulSoup(response, 'lxml')
+			
+			author = soup.find('div', attrs = {'class':'author'})
+			shop_contact = soup.find('div', attrs = {'class':'shop-contact'})
+
+			if author:
+				phone_number = author.find('a', attrs = {'class':'phone'})
+				author_name = author.find('div', attrs = {'class':'name'})
+				
+				res['type'] = 'private'
+				res['phone_number'] = phone_number.text
+				res['author_name'] = author_name.text  
+			
+			if shop_contact:
+				phone_number =  shop_contact.find('a', attrs = {'class', 'shop-phones--number'})
+				shop_title   =  shop_contact.find(attrs = {'class':'shop-contact--shop-name'})
+				
+				res['type'] = 'shop'	
+				res['phone_number'] = phone_number.text 
+				res['shop_title'] = shop_title.text 
+
+			return res 
+
 			
 def main():
 	if len(sys.argv) < 2:
@@ -119,11 +151,11 @@ def main():
 	search_request = sys.argv[1]
 	if len(sys.argv) == 2:
 		rs = DataGraber(search_request, show_process = True, max_results = 10) # edit chrome driver
-		rs.get_data_from_tap_az()
+		rs.get_data_from_tapaz()
 	elif len(sys.argv) == 3:
 		mx_out = int(sys.argv[2])
 		rs = DataGraber(search_request, show_process = True, max_results = mx_out) # edit chrome driver
-		rs.get_data_from_tap_az()
+		rs.get_data_from_tapaz()
 
 if __name__ == "__main__":
 	main()
